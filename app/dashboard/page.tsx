@@ -10,25 +10,21 @@ import {
   Search, Bell, LogOut, Loader2, Sparkles, Plus, Award, Hash, MoreHorizontal
 } from 'lucide-react';
 
-// TS Interfaces for type safety & preventing editor complaints
 interface Profile {
+  id: string;
   full_name: string;
   c_coins: number;
   study_streak: number;
-  university?: string;
 }
 
 interface Post {
   id: string;
+  user_id: string;
   user_name: string;
-  user_avatar: string;
   timestamp: string;
   content: string;
-  is_verified?: boolean;
-  attachments?: string[];
   upvotes: number;
-  comments_count: number;
-  has_upvoted?: boolean;
+  has_upvoted: boolean;
 }
 
 export default function DashboardPage() {
@@ -36,60 +32,68 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   
-  // Create Post state
+  const [posts, setPosts] = useState<Post[]>([]);
   const [postContent, setPostContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Hardcoded initial Mock Posts based on image mockup
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '1',
-      user_name: 'Adebayo S.',
-      user_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop',
-      timestamp: '18 mins ago',
-      content: 'Verified CSC201 Past Questions now uploaded! Check them out and share with any 200L computer science buddies.',
-      is_verified: true,
-      attachments: ['csc201_exam_2024.pdf', 'csc201_study_guide.pdf'],
-      upvotes: 24,
-      comments_count: 5,
-    },
-    {
-      id: '2',
-      user_name: 'Dinaume',
-      user_avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop',
-      timestamp: '1 hour ago',
-      content: 'Anyone has UNILAG GST101 study group link? Trying to get access to these verify materials asap!',
-      upvotes: 12,
-      comments_count: 8,
-    }
-  ]);
+  // Parse first name for the header
+  const firstName = profile?.full_name?.split(' ')[0] || 'Student';
 
-  // Fetch logged in user and profile
+  const fetchPosts = async (userId: string) => {
+    // Fetch posts, join with profiles for the name, and join with likes for the count
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        content,
+        created_at,
+        user_id,
+        profiles:user_id (full_name),
+        post_likes (user_id)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching posts:', error);
+      return;
+    }
+
+    // Format the raw data into our Post interface
+    if (data) {
+      const formattedPosts: Post[] = data.map((p: any) => ({
+        id: p.id,
+        user_id: p.user_id,
+        user_name: p.profiles?.full_name || 'Anonymous Student',
+        timestamp: new Date(p.created_at).toLocaleDateString() + ' ' + new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        content: p.content,
+        upvotes: p.post_likes?.length || 0,
+        has_upvoted: p.post_likes?.some((like: any) => like.user_id === userId) || false,
+      }));
+      setPosts(formattedPosts);
+    }
+  };
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
-          router.push('/signup'); // Force send to auth page if they aren't logged in
+          router.push('/signup');
           return;
         }
 
         const { data, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name, c_coins, study_streak, university')
+          .select('id, full_name, c_coins, study_streak')
           .eq('id', user.id)
           .single();
 
-        if (profileError) {
-          // Fallback mockup stats if Supabase profile table trigger failed during manual testing
-          setProfile({
-            full_name: user.user_metadata?.full_name || 'Student',
-            c_coins: 450,
-            study_streak: 12,
-          });
-        } else {
-          setProfile(data);
-        }
+        if (profileError) throw profileError;
+        setProfile(data);
+        
+        // Fetch real posts once we know who is logged in
+        await fetchPosts(user.id);
+
       } catch (err) {
         console.error(err);
       } finally {
@@ -100,46 +104,61 @@ export default function DashboardPage() {
     fetchUserData();
   }, [router]);
 
-  // Submit Post logic
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postContent.trim()) return;
-
+    if (!postContent.trim() || !profile) return;
     setIsSubmitting(true);
-    // Mimicking creation inside component state
-    const newPost: Post = {
-      id: String(Date.now()),
-      user_name: profile?.full_name || 'Me',
-      user_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop',
-      timestamp: 'Just now',
-      content: postContent,
-      upvotes: 0,
-      comments_count: 0
-    };
 
-    setTimeout(() => {
-      setPosts([newPost, ...posts]);
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .insert({ user_id: profile.id, content: postContent });
+
+      if (error) throw error;
+      
       setPostContent('');
+      await fetchPosts(profile.id); // Refresh the feed
+    } catch (error) {
+      console.error('Error creating post:', error);
+    } finally {
       setIsSubmitting(false);
-    }, 600);
+    }
   };
 
-  // Upvote logic
-  const handleUpvote = (postId: string) => {
+  const handleUpvote = async (postId: string) => {
+    if (!profile) return;
+
+    // Optimistic UI update (feels instant to the user)
     setPosts(posts.map(p => {
       if (p.id === postId) {
-        const hasUpvoted = !p.has_upvoted;
+        const isNowUpvoted = !p.has_upvoted;
         return {
           ...p,
-          has_upvoted,
-          upvotes: hasUpvoted ? p.upvotes + 1 : p.upvotes - 1
+          has_upvoted: isNowUpvoted,
+          upvotes: isNowUpvoted ? p.upvotes + 1 : p.upvotes - 1
         };
       }
       return p;
     }));
+
+    // Find the specific post to check its real state
+    const targetPost = posts.find(p => p.id === postId);
+    if (!targetPost) return;
+
+    try {
+      if (targetPost.has_upvoted) {
+        // User already upvoted, so we remove the like
+        await supabase.from('post_likes').delete().match({ post_id: postId, user_id: profile.id });
+      } else {
+        // Add the like
+        await supabase.from('post_likes').insert({ post_id: postId, user_id: profile.id });
+      }
+    } catch (error) {
+      console.error('Error toggling upvote:', error);
+      await fetchPosts(profile.id); // Revert to database truth if it failed
+    }
   };
 
-  // Handle Logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/signup');
@@ -163,7 +182,6 @@ export default function DashboardPage() {
         <div className="absolute top-1/2 right-1/4 w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* Outer wrapper */}
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-grow relative z-10 flex">
         
         {/* ===================== LEFT SIDEBAR (Desktop Only) ===================== */}
@@ -179,19 +197,19 @@ export default function DashboardPage() {
             </Link>
 
             <nav className="space-y-1.5">
-              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-blue-400 font-semibold transition-all">
+              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-blue-400 font-semibold transition-all cursor-pointer">
                 <Home className="w-5 h-5" />
                 <span>Home Feed</span>
               </button>
-              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/50 transition-all">
+              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/50 transition-all cursor-pointer">
                 <BookOpen className="w-5 h-5" />
                 <span>Past Qs</span>
               </button>
-              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/50 transition-all">
+              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/50 transition-all cursor-pointer">
                 <Bot className="w-5 h-5" />
                 <span>Samuel AI</span>
               </button>
-              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/50 transition-all">
+              <button className="w-full flex items-center gap-4.5 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/50 transition-all cursor-pointer">
                 <User className="w-5 h-5" />
                 <span>Profile</span>
               </button>
@@ -202,7 +220,7 @@ export default function DashboardPage() {
             onClick={handleLogout}
             className="flex items-center gap-4.5 px-4 py-3.5 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer"
           >
-            <LogOut className="w-5 h-5 animate-pulse" />
+            <LogOut className="w-5 h-5" />
             <span className="font-semibold text-sm">Sign Out</span>
           </button>
         </aside>
@@ -215,11 +233,10 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-0.5">
               <span className="text-xs text-blue-400 font-semibold tracking-wider uppercase">V2.4 Academic</span>
               <h1 className="text-lg font-bold text-white truncate max-w-[140px] sm:max-w-[200px]">
-                {profile?.full_name || 'New Student'}
+                Welcome, {firstName}
               </h1>
             </div>
 
-            {/* Micro Stats */}
             <div className="flex gap-2">
               <div className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 px-3 py-1.5 rounded-xl text-orange-400">
                 <Flame className="w-4 h-4 text-orange-500 fill-orange-500/20 animate-pulse" />
@@ -249,9 +266,6 @@ export default function DashboardPage() {
                 <button type="button" className="p-2 rounded-xl bg-zinc-800/50 text-zinc-400 hover:text-white transition-colors cursor-pointer">
                   <Paperclip className="w-4.5 h-4.5" />
                 </button>
-                <button type="button" className="p-2 rounded-xl bg-zinc-800/50 text-zinc-400 hover:text-white transition-colors cursor-pointer">
-                  <Smile className="w-4.5 h-4.5" />
-                </button>
               </div>
 
               <button 
@@ -271,82 +285,60 @@ export default function DashboardPage() {
             </div>
           </form>
 
-          {/* The Scrollable Stream of Posts */}
+          {/* The Scrollable Stream of Real Posts */}
           <div className="space-y-4">
-            {posts.map((post) => (
-              <article key={post.id} className="bg-zinc-900/40 border border-zinc-800/60 p-4 sm:p-5 rounded-2xl shadow-sm transition-all duration-300">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex gap-3">
-                    <img 
-                      src={post.user_avatar} 
-                      alt="" 
-                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-zinc-800 shrink-0" 
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-white hover:underline cursor-pointer text-sm sm:text-base">{post.user_name}</span>
-                        {post.is_verified && (
-                          <div className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-extrabold uppercase tracking-wider">
-                            Verified
-                          </div>
-                        )}
+            {posts.length === 0 ? (
+              <div className="text-center py-10 text-zinc-500">No posts yet. Be the first to start the conversation!</div>
+            ) : (
+              posts.map((post) => (
+                <article key={post.id} className="bg-zinc-900/40 border border-zinc-800/60 p-4 sm:p-5 rounded-2xl shadow-sm transition-all duration-300">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-3">
+                      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold border-2 border-zinc-800 shrink-0">
+                        {post.user_name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-xs text-zinc-500">{post.timestamp}</span>
-                    </div>
-                  </div>
-                  <button className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 hover:bg-zinc-800/50 rounded-lg cursor-pointer">
-                    <MoreHorizontal className="w-4.5 h-4.5" />
-                  </button>
-                </div>
-
-                <p className="text-sm sm:text-base text-zinc-200 leading-relaxed mb-4 whitespace-pre-wrap">
-                  {post.content}
-                </p>
-
-                {/* Upload attachment display if present */}
-                {post.attachments && post.attachments.length > 0 && (
-                  <div className="grid sm:grid-cols-2 gap-2 mb-4">
-                    {post.attachments.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
-                        <div className="flex items-center gap-2.5 truncate">
-                          <BookOpen className="w-5 h-5 text-zinc-400 shrink-0" />
-                          <span className="text-xs sm:text-sm text-zinc-300 font-medium truncate">{file}</span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-white hover:underline cursor-pointer text-sm sm:text-base">{post.user_name}</span>
                         </div>
-                        <span className="text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-1 rounded-md font-bold uppercase tracking-wider select-none shrink-0 ml-2">
-                          PDF
-                        </span>
+                        <span className="text-xs text-zinc-500">{post.timestamp}</span>
                       </div>
-                    ))}
+                    </div>
+                    <button className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 hover:bg-zinc-800/50 rounded-lg cursor-pointer">
+                      <MoreHorizontal className="w-4.5 h-4.5" />
+                    </button>
                   </div>
-                )}
 
-                <div className="flex gap-2 sm:gap-4 border-t border-zinc-800/40 pt-3">
-                  <button 
-                    onClick={() => handleUpvote(post.id)}
-                    className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${post.has_upvoted ? 'bg-blue-500/10 border border-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.05)]' : 'bg-zinc-800/30 border border-transparent hover:bg-zinc-800/65 text-zinc-400'}`}
-                  >
-                    <ArrowUp className={`w-4 h-4 ${post.has_upvoted ? 'text-blue-400 animate-bounce' : 'text-zinc-400'}`} />
-                    <span>{post.upvotes} Upvotes</span>
-                  </button>
-                  <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65 hover:text-white transition-all text-xs sm:text-sm font-semibold cursor-pointer">
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{post.comments_count} Comments</span>
-                  </button>
-                  <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65 hover:text-white transition-all text-xs sm:text-sm font-semibold cursor-pointer">
-                    <Share2 className="w-4 h-4" />
-                    <span>Share</span>
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <p className="text-sm sm:text-base text-zinc-200 leading-relaxed mb-4 whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+
+                  <div className="flex gap-2 sm:gap-4 border-t border-zinc-800/40 pt-3">
+                    <button 
+                      onClick={() => handleUpvote(post.id)}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${post.has_upvoted ? 'bg-blue-500/10 border border-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.05)]' : 'bg-zinc-800/30 border border-transparent hover:bg-zinc-800/65 text-zinc-400'}`}
+                    >
+                      <ArrowUp className={`w-4 h-4 ${post.has_upvoted ? 'text-blue-400 animate-bounce' : 'text-zinc-400'}`} />
+                      <span>{post.upvotes} Upvotes</span>
+                    </button>
+                    <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65 hover:text-white transition-all text-xs sm:text-sm font-semibold cursor-pointer">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Comment</span>
+                    </button>
+                    <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65 hover:text-white transition-all text-xs sm:text-sm font-semibold cursor-pointer">
+                      <Share2 className="w-4 h-4" />
+                      <span>Share</span>
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
 
         </main>
 
         {/* ===================== RIGHT SIDEBAR (Desktop Only) ===================== */}
         <aside className="hidden lg:flex flex-col w-80 shrink-0 py-8 sticky top-0 h-screen border-l border-zinc-800/60 pl-6 space-y-6">
-          
-          {/* Quick Find Bar */}
           <div className="relative">
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
             <input 
@@ -356,10 +348,8 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Campus Trending Block */}
           <section className="bg-zinc-900/40 border border-zinc-800/60 p-5 rounded-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
-            
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-2">
                 <Hash className="w-4 h-4 text-blue-500" />
@@ -367,33 +357,19 @@ export default function DashboardPage() {
               </h2>
               <Sparkles className="w-4.5 h-4.5 text-blue-400" />
             </div>
-
             <div className="space-y-1">
               <p className="text-xl font-extrabold text-white leading-tight">#ASUStrike</p>
               <p className="text-xs text-zinc-500 font-medium">Trending across all Nigerian campus hubs</p>
             </div>
-            
             <div className="mt-4 pt-3 border-t border-zinc-800/40 flex items-center justify-between text-xs text-zinc-400">
               <span className="font-medium">1,450 students talking</span>
               <span className="text-blue-500 font-semibold cursor-pointer hover:underline">Join &rarr;</span>
             </div>
           </section>
 
-          {/* Network Banner */}
-          <section className="bg-gradient-to-br from-indigo-500 to-violet-600 p-5 rounded-2xl text-white relative overflow-hidden shadow-lg shadow-indigo-500/10">
-            <div className="absolute top-0 right-0 translate-y-1 translate-x-1 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none" />
-            <div className="flex gap-1.5 items-center mb-2 bg-white/10 border border-white/20 w-fit px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
-              <Award className="w-3 h-3" />
-              <span>Network Badge</span>
-            </div>
-            <h3 className="text-lg font-extrabold leading-tight mb-1">#1 Student Network</h3>
-            <p className="text-xs text-indigo-100 font-medium leading-relaxed">Boost stats with verify documents to raise metrics and compete with peer study groups.</p>
-          </section>
-
           <footer className="text-center pt-4">
             <p className="text-[10px] text-zinc-600 tracking-wide">&copy; 2026 Studial. All rights reserved.</p>
           </footer>
-
         </aside>
 
       </div>
@@ -412,10 +388,7 @@ export default function DashboardPage() {
           <Bot className="w-5 h-5" />
           <span className="text-[10px] font-bold tracking-wide">Samuel AI</span>
         </button>
-        <button 
-          onClick={() => router.push('/profile')} 
-          className="flex flex-col items-center gap-1.5 text-zinc-500 hover:text-white transition-colors py-0.5 px-3"
-        >
+        <button className="flex flex-col items-center gap-1.5 text-zinc-500 hover:text-white transition-colors py-0.5 px-3">
           <User className="w-5 h-5" />
           <span className="text-[10px] font-bold tracking-wide">Profile</span>
         </button>
@@ -424,3 +397,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
