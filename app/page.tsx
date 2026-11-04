@@ -91,7 +91,7 @@ export default function LandingPage() {
               <button onClick={toggleTheme} aria-label="Toggle theme" className="p-2 rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                 <ThemeIcon className="w-5 h-5" />
               </button>
-              <Link href="/signin" className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 active:scale-95 transition-all">
+              <Link href="/signup" className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 active:scale-95 transition-all">
                 Sign In
               </Link>
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
@@ -107,7 +107,7 @@ export default function LandingPage() {
             <Link href="#home" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-base font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-lg">Home</Link>
             <Link href="#features" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-base font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-lg">Features</Link>
             <Link href="#campus-gist" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 text-base font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-lg">Campus Gist</Link>
-            <Link href="/signin" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 mt-4 text-center text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md">Sign In</Link>
+            <Link href="/signup" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 mt-4 text-center text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md">Sign In</Link>
           </div>
         )}
       </header>
@@ -130,7 +130,7 @@ export default function LandingPage() {
               <Link href="/signup" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/25 transition-all">
                 <span>Get Started -&gt;</span>
               </Link>
-              <Link href="/signin" className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-xl text-base font-semibold text-zinc-900 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 backdrop-blur-sm transition-all">
+              <Link href="/signup" className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-xl text-base font-semibold text-zinc-900 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 backdrop-blur-sm transition-all">
                 Sign In
               </Link>
             </div>
