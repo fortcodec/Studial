@@ -18,6 +18,13 @@ interface Profile {
   last_login?: string;
 }
 
+interface Comment {
+  id: string;
+  content: string;
+  created_at: string;
+  user_name: string;
+}
+
 interface Post {
   id: string;
   user_id: string;
@@ -27,23 +34,21 @@ interface Post {
   upvotes: number;
   has_upvoted: boolean;
   comments_count: number;
+  comments: Comment[];
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   
-  // Theme State
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(true);
 
-  // Core States
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postContent, setPostContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Interactive UI States
   const [showReward, setShowReward] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [activeCommentPost, setActiveCommentPost] = useState<string | null>(null);
@@ -55,7 +60,6 @@ export default function DashboardPage() {
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Student';
 
-  // Theme logic
   useEffect(() => {
     setMounted(true);
     const stored = localStorage.getItem('studial-theme');
@@ -85,7 +89,7 @@ export default function DashboardPage() {
         id, content, created_at, user_id,
         profiles:user_id (full_name),
         post_likes (user_id),
-        comments (id)
+        comments (id, content, created_at, profiles:user_id (full_name))
       `)
       .order('created_at', { ascending: false })
       .limit(20);
@@ -99,7 +103,13 @@ export default function DashboardPage() {
         content: p.content,
         upvotes: p.post_likes?.length || 0,
         has_upvoted: p.post_likes?.some((like: any) => like.user_id === userId) || false,
-        comments_count: p.comments?.length || 0
+        comments_count: p.comments?.length || 0,
+        comments: p.comments?.map((c: any) => ({
+          id: c.id,
+          content: c.content,
+          created_at: c.created_at,
+          user_name: c.profiles?.full_name || 'Student'
+        })).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
       }));
       setPosts(formattedPosts);
     }
@@ -167,34 +177,42 @@ export default function DashboardPage() {
     }
   };
 
-  // The New Functional Comment System
   const handlePostComment = async (postId: string) => {
     if (!commentText.trim() || !profile) return;
     setIsCommenting(true);
+    const textToSubmit = commentText;
+    
+    // Optimistic UI update (shows comment instantly)
+    const newComment: Comment = {
+      id: String(Date.now()),
+      content: textToSubmit,
+      created_at: new Date().toISOString(),
+      user_name: profile.full_name || 'Me'
+    };
+
+    setPosts(posts.map(p => {
+      if (p.id === postId) {
+        return { 
+          ...p, 
+          comments_count: p.comments_count + 1,
+          comments: [...p.comments, newComment]
+        };
+      }
+      return p;
+    }));
+    
+    setCommentText('');
 
     try {
-      // 1. Insert into database
       const { error } = await supabase.from('comments').insert({
         post_id: postId,
         user_id: profile.id,
-        content: commentText
+        content: textToSubmit
       });
-
       if (error) throw error;
-
-      // 2. Optimistic UI update (instantly update comment count)
-      setPosts(posts.map(p => {
-        if (p.id === postId) {
-          return { ...p, comments_count: p.comments_count + 1 };
-        }
-        return p;
-      }));
-      
-      // 3. Reset input
-      setCommentText('');
-      setActiveCommentPost(null); 
     } catch (error) {
       console.error('Error posting comment:', error);
+      await fetchPosts(profile.id); // Re-fetch if it fails
     } finally {
       setIsCommenting(false);
     }
@@ -239,7 +257,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col pb-24 md:pb-0 relative transition-colors duration-300">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col pb-28 transition-colors duration-300">
       
       {showReward && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-10 fade-in duration-500">
@@ -267,28 +285,36 @@ export default function DashboardPage() {
         {/* CENTER FEED */}
         <main className="flex-1 py-6 md:py-8 md:px-8 lg:border-r lg:border-l border-zinc-200 dark:border-zinc-800/60 max-w-3xl mx-auto w-full transition-colors">
           
-          <header className="flex justify-between items-center bg-white/80 dark:bg-zinc-900/40 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/60 p-4 rounded-2xl mb-6 sticky top-4 z-30 shadow-sm transition-colors">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold tracking-wider uppercase">V2.4 Academic</span>
-              <h1 className="text-lg font-bold text-zinc-900 dark:text-white truncate max-w-[140px] sm:max-w-[200px]">
-                Welcome, {firstName}
-              </h1>
+          {/* UPDATED: Resized & Uncramped Header */}
+          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/80 dark:bg-zinc-900/40 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/60 p-5 rounded-2xl mb-6 sticky top-4 z-30 shadow-sm transition-colors gap-4">
+            
+            <div className="flex justify-between items-center w-full sm:w-auto">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold tracking-wider uppercase">V2.4 Academic</span>
+                <h1 className="text-xl font-bold text-zinc-900 dark:text-white truncate max-w-[220px]">
+                  Welcome, {firstName}
+                </h1>
+              </div>
+              {/* Theme toggle on mobile shows here for better spacing */}
+              <button onClick={toggleTheme} className="sm:hidden p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <ThemeIcon className="w-6 h-6" />
+              </button>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Theme Toggle Button Added to Header */}
-              <button onClick={toggleTheme} className="p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button onClick={toggleTheme} className="hidden sm:block p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                 <ThemeIcon className="w-5 h-5" />
               </button>
-
-              <div className="flex items-center gap-1.5 bg-orange-100 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-3 py-1.5 rounded-xl text-orange-600 dark:text-orange-400">
+              <div className="flex items-center gap-1.5 bg-orange-100 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-3 py-2 rounded-xl text-orange-600 dark:text-orange-400 flex-1 justify-center sm:flex-none">
                 <Flame className="w-4 h-4 text-orange-500 fill-orange-500/20" />
-                <span className="text-xs sm:text-sm font-bold">{profile?.study_streak || 0} Days</span>
+                <span className="text-sm font-bold">{profile?.study_streak || 0} Days</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-yellow-100 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 px-3 py-1.5 rounded-xl text-yellow-600 dark:text-yellow-400">
+              <div className="flex items-center gap-1.5 bg-yellow-100 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 px-3 py-2 rounded-xl text-yellow-600 dark:text-yellow-400 flex-1 justify-center sm:flex-none">
                 <Coins className="w-4 h-4 text-yellow-500 fill-yellow-500/20" />
-                <span className="text-xs sm:text-sm font-bold">{profile?.c_coins || 0} C-Coins</span>
+                <span className="text-sm font-bold">{profile?.c_coins || 0} C-Coins</span>
               </div>
             </div>
+
           </header>
 
           <form onSubmit={handleCreatePost} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/60 p-4 rounded-2xl mb-6 shadow-sm transition-colors">
@@ -322,7 +348,7 @@ export default function DashboardPage() {
                   <div className="flex gap-3 items-center">
                     <div 
                       onClick={() => handleChatUser(post.user_id)}
-                      className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold border border-blue-200 dark:border-zinc-700 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
+                      className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold border border-blue-200 dark:border-zinc-700 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors shrink-0"
                     >
                       {post.user_name.charAt(0).toUpperCase()}
                     </div>
@@ -364,7 +390,7 @@ export default function DashboardPage() {
                   <button 
                     onClick={() => {
                       setActiveCommentPost(activeCommentPost === post.id ? null : post.id);
-                      setCommentText(''); // Clear input when toggling a new comment box
+                      setCommentText(''); 
                     }} 
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold"
                   >
@@ -376,15 +402,28 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                {/* The Functional Comment Box */}
+                {/* VISIBLE COMMENT SECTION */}
                 {activeCommentPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-2">
+                    
+                    {/* Render existing comments */}
+                    {post.comments.length > 0 && (
+                      <div className="mb-4 space-y-3">
+                        {post.comments.map(comment => (
+                          <div key={comment.id} className="bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/50">
+                            <span className="font-bold text-xs text-zinc-900 dark:text-white mr-2">{comment.user_name}</span>
+                            <span className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-300">{comment.content}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex gap-2">
                       <input 
                         type="text" 
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Write a comment..." 
+             placeholder="Write a comment..." 
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handlePostComment(post.id);
                         }}
@@ -393,7 +432,7 @@ export default function DashboardPage() {
                       <button 
                         onClick={() => handlePostComment(post.id)}
                         disabled={isCommenting || !commentText.trim()}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer flex items-center justify-center min-w-[60px]"
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer flex items-center justify-center min-w-[70px]"
                       >
                         {isCommenting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post'}
                       </button>
@@ -406,14 +445,22 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      {/* Restored Labels to Mobile Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800/80 z-40 flex justify-around py-2 pb-4 transition-colors">
-        <button className="flex flex-col items-center gap-1 text-blue-600 dark:text-blue-500 py-1 px-3">
-          <Home className="w-5 h-5 fill-blue-500/10" />
+      {/* UPDATED: Rigidly Fixed Bottom Nav with Explicit Safe-Area Sizing */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800 z-50 flex justify-around items-center px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-colors shadow-[0_-5px_20px_rgba(0,0,0,0.05)] dark:shadow-none min-h-[70px]">
+        <button className="flex flex-col items-center justify-center gap-1.5 text-blue-600 dark:text-blue-500 w-16">
+          <Home className="w-6 h-6 fill-blue-500/10" />
           <span className="text-[10px] font-bold tracking-wide">Home</span>
         </button>
-        <button className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
-          <BookOpen className="w-5 h-5" />
+        <button className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16">
+          <BookOpen className="w-6 h-6" />
+          <span className="text-[10px] font-bold tracking-wide">Past Qs</span>
+        </button>
+        <button onClick={() => router.push('/messages')} className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16">
+          <MessageCircle className="w-6 h-6" />
+          <span className="text-[10px] font-bold tracking-wide">Chat</span>
+        </button>
+        <button className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16">
+          <User className="w-6 h-6" />
           <span className="text-[10px] font-bold tracking-wide">Profile</span>
         </button>
       </nav>
