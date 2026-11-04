@@ -19,9 +19,14 @@ import {
 } from 'lucide-react';
 
 export default function AuthPage() {
+  // Form State
   const [isSignUp, setIsSignUp] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedUni, setSelectedUni] = useState('');
+  
+  // Password Strength State
+  const [password, setPassword] = useState('');
+  const [strength, setStrength] = useState(0);
   
   // Theme State
   const [mounted, setMounted] = useState(false);
@@ -52,6 +57,17 @@ export default function AuthPage() {
     }
     
     localStorage.setItem('studial-theme', nextDark ? 'dark' : 'light');
+  };
+
+  const evaluatePassword = (val: string) => {
+    setPassword(val);
+    let score = 0;
+    if (!val) return setStrength(0);
+    if (val.length > 7) score += 1;
+    if (/[A-Z]/.test(val)) score += 1;
+    if (/[0-9]/.test(val)) score += 1;
+    if (/[^A-Za-z0-9]/.test(val)) score += 1;
+    setStrength(score);
   };
 
   const ThemeIcon = mounted ? (isDark ? Moon : Sun) : () => <div className="w-5 h-5" />;
@@ -184,20 +200,37 @@ export default function AuthPage() {
               />
             </div>
 
-            <div className="relative">
-              <Lock className="absolute left-4 top-3.5 w-5 h-5 text-zinc-400 dark:text-zinc-500" />
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                placeholder="Password" 
-                className="w-full bg-white dark:bg-zinc-950/50 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 pl-12 pr-12 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-3.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+            {/* Password Input with Strength Meter */}
+            <div className="space-y-2">
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password}
+                  onChange={(e) => evaluatePassword(e.target.value)}
+                  placeholder="Password" 
+                  className="w-full bg-white dark:bg-zinc-950/50 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 pl-12 pr-12 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-3.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              
+              {/* Strength Meter Bar (Only show on Sign Up) */}
+              {isSignUp && password.length > 0 && (
+                <>
+                  <div className="flex gap-1 mt-2 h-1.5 w-full rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800">
+                    <div className={`h-full transition-all duration-300 ${strength >= 1 ? (strength === 1 ? 'bg-red-500 w-1/4' : strength === 2 ? 'bg-amber-500 w-2/4' : strength === 3 ? 'bg-blue-500 w-3/4' : 'bg-emerald-500 w-full') : 'w-0'}`} />
+                  </div>
+                  <p className={`text-xs mt-1 ${strength <= 1 ? 'text-red-500' : strength === 2 ? 'text-amber-500' : strength === 3 ? 'text-blue-500' : 'text-emerald-500'}`}>
+                    {strength <= 1 ? 'Weak - Add numbers & symbols' : strength === 2 ? 'Fair - Add uppercase letters' : strength === 3 ? 'Good - Add special characters' : 'Strong password'}
+                  </p>
+                </>
+              )}
             </div>
 
             {!isSignUp && (
