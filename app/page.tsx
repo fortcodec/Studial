@@ -208,7 +208,7 @@ export default function LandingPage() {
             <span className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">Studial.</span>
           </div>
           <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            &copy; {new Date().getFullYear()} Studial. All rights reserved.
+            &copy; 2026 Studial. All rights reserved.
           </p>
         </div>
       </footer>
