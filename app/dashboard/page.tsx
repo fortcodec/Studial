@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   GraduationCap, Flame, Coins, Image as ImageIcon, Paperclip, Send, 
   ArrowUp, MessageSquare, Share2, Home, BookOpen, Bot, User, 
-  Search, LogOut, Loader2, Sparkles, Hash, MoreHorizontal, X, MessageCircle, Sun, Moon
+  Search, LogOut, Loader2, Sparkles, Hash, MoreHorizontal, X, MessageCircle, Sun, Moon, Trash2
 } from 'lucide-react';
 
 interface Profile {
@@ -177,12 +177,28 @@ export default function DashboardPage() {
     }
   };
 
+  // 🔥 The New Delete Function
+  const handleDeletePost = async (postId: string) => {
+    if (!profile) return;
+    
+    // Optimistic remove from UI instantly
+    setPosts(posts.filter(p => p.id !== postId));
+    setActiveDropdown(null);
+
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      await fetchPosts(profile.id); // Bring it back if DB failed
+    }
+  };
+
   const handlePostComment = async (postId: string) => {
     if (!commentText.trim() || !profile) return;
     setIsCommenting(true);
     const textToSubmit = commentText;
     
-    // Optimistic UI update (shows comment instantly)
     const newComment: Comment = {
       id: String(Date.now()),
       content: textToSubmit,
@@ -212,7 +228,7 @@ export default function DashboardPage() {
       if (error) throw error;
     } catch (error) {
       console.error('Error posting comment:', error);
-      await fetchPosts(profile.id); // Re-fetch if it fails
+      await fetchPosts(profile.id); 
     } finally {
       setIsCommenting(false);
     }
@@ -282,12 +298,9 @@ export default function DashboardPage() {
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-grow relative z-10 flex">
         
-        {/* CENTER FEED */}
         <main className="flex-1 py-6 md:py-8 md:px-8 lg:border-r lg:border-l border-zinc-200 dark:border-zinc-800/60 max-w-3xl mx-auto w-full transition-colors">
           
-          {/* UPDATED: Resized & Uncramped Header */}
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/80 dark:bg-zinc-900/40 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/60 p-5 rounded-2xl mb-6 sticky top-4 z-30 shadow-sm transition-colors gap-4">
-            
             <div className="flex justify-between items-center w-full sm:w-auto">
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold tracking-wider uppercase">V2.4 Academic</span>
@@ -295,7 +308,6 @@ export default function DashboardPage() {
                   Welcome, {firstName}
                 </h1>
               </div>
-              {/* Theme toggle on mobile shows here for better spacing */}
               <button onClick={toggleTheme} className="sm:hidden p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                 <ThemeIcon className="w-6 h-6" />
               </button>
@@ -314,7 +326,6 @@ export default function DashboardPage() {
                 <span className="text-sm font-bold">{profile?.c_coins || 0} C-Coins</span>
               </div>
             </div>
-
           </header>
 
           <form onSubmit={handleCreatePost} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/60 p-4 rounded-2xl mb-6 shadow-sm transition-colors">
@@ -364,17 +375,31 @@ export default function DashboardPage() {
                   </div>
                   
                   <div className="relative">
-                    <button onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)} className="text-zinc-500 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+                    <button onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)} className="text-zinc-500 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
                       <MoreHorizontal className="w-5 h-5" />
                     </button>
                     {activeDropdown === post.id && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-20 py-1 animate-in fade-in zoom-in-95">
-                        <button onClick={() => handleChatUser(post.user_id)} className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2">
-                          <MessageCircle className="w-4 h-4" /> Message User
-                        </button>
-                        {post.user_id === profile?.id && (
-                          <button className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">Delete Post</button>
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 py-1 animate-in fade-in zoom-in-95">
+                        
+                        {post.user_id !== profile?.id ? (
+                          <button 
+                            onClick={() => {
+                              setActiveDropdown(null);
+                              handleChatUser(post.user_id);
+                            }} 
+                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 cursor-pointer"
+                          >
+                            <MessageCircle className="w-4 h-4" /> Message User
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleDeletePost(post.id)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 rounded-xl cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" /> Delete Post
+                          </button>
                         )}
+                        
                       </div>
                     )}
                   </div>
@@ -392,38 +417,34 @@ export default function DashboardPage() {
                       setActiveCommentPost(activeCommentPost === post.id ? null : post.id);
                       setCommentText(''); 
                     }} 
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold cursor-pointer"
                   >
                     <MessageSquare className="w-4 h-4" />
                     <span>{post.comments_count}</span>
                   </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold ml-auto">
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold ml-auto cursor-pointer">
                     <Share2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* VISIBLE COMMENT SECTION */}
                 {activeCommentPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-2">
-                    
-                    {/* Render existing comments */}
                     {post.comments.length > 0 && (
                       <div className="mb-4 space-y-3">
                         {post.comments.map(comment => (
-                          <div key={comment.id} className="bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/50">
+ <div key={comment.id} className="bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/50">
                             <span className="font-bold text-xs text-zinc-900 dark:text-white mr-2">{comment.user_name}</span>
                             <span className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-300">{comment.content}</span>
                           </div>
                         ))}
                       </div>
                     )}
-
                     <div className="flex gap-2">
                       <input 
                         type="text" 
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-             placeholder="Write a comment..." 
+                        placeholder="Write a comment..." 
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handlePostComment(post.id);
                         }}
@@ -445,21 +466,20 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      {/* UPDATED: Rigidly Fixed Bottom Nav with Explicit Safe-Area Sizing */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800 z-50 flex justify-around items-center px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-colors shadow-[0_-5px_20px_rgba(0,0,0,0.05)] dark:shadow-none min-h-[70px]">
-        <button className="flex flex-col items-center justify-center gap-1.5 text-blue-600 dark:text-blue-500 w-16">
+        <button className="flex flex-col items-center justify-center gap-1.5 text-blue-600 dark:text-blue-500 w-16 cursor-pointer">
           <Home className="w-6 h-6 fill-blue-500/10" />
           <span className="text-[10px] font-bold tracking-wide">Home</span>
         </button>
-        <button className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16">
+        <button className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16 cursor-pointer">
           <BookOpen className="w-6 h-6" />
           <span className="text-[10px] font-bold tracking-wide">Past Qs</span>
         </button>
-        <button onClick={() => router.push('/messages')} className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16">
+        <button onClick={() => router.push('/messages')} className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16 cursor-pointer">
           <MessageCircle className="w-6 h-6" />
           <span className="text-[10px] font-bold tracking-wide">Chat</span>
         </button>
-        <button className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16">
+        <button className="flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors w-16 cursor-pointer">
           <User className="w-6 h-6" />
           <span className="text-[10px] font-bold tracking-wide">Profile</span>
         </button>
