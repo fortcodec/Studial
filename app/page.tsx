@@ -10,7 +10,9 @@ import {
   X, 
   BookOpen, 
   Coins, 
-  Bot 
+  Bot,
+  Zap,
+  Users
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -18,15 +20,17 @@ export default function LandingPage() {
   const [isDark, setIsDark] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Prevent hydration mismatch for dark mode
+  // Rock-solid hydration & theme detection
   useEffect(() => {
     setMounted(true);
     const stored = localStorage.getItem('studial-theme');
-    if (stored) {
-      const isDarkMode = stored === 'dark';
-      setIsDark(isDarkMode);
-      document.documentElement.classList.toggle('dark', isDarkMode);
+    
+    if (stored === 'light') {
+      setIsDark(false);
+      document.documentElement.classList.remove('dark');
     } else {
+      // Default to dark mode for that premium fintech aesthetic
+      setIsDark(true);
       document.documentElement.classList.add('dark');
     }
   }, []);
@@ -34,12 +38,22 @@ export default function LandingPage() {
   const toggleTheme = () => {
     const nextDark = !isDark;
     setIsDark(nextDark);
-    document.documentElement.classList.toggle('dark', nextDark);
+    
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    
     localStorage.setItem('studial-theme', nextDark ? 'dark' : 'light');
   };
 
+  // Prevent hydration mismatch flashes by not rendering icons until mounted
+  const ThemeIcon = mounted ? (isDark ? Moon : Sun) : () => <div className="w-5 h-5" />;
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-300 selection:bg-blue-600 selection:text-white relative overflow-x-hidden font-sans">
+      
       {/* Background Subtle Gradient Blobs */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-tr from-blue-600/20 via-indigo-500/10 to-transparent blur-3xl opacity-70 dark:opacity-40" />
@@ -47,10 +61,11 @@ export default function LandingPage() {
         <div className="absolute top-1/2 -right-48 w-96 h-96 bg-amber-500/10 dark:bg-amber-500/10 rounded-full blur-3xl" />
       </div>
 
-      {/* 1. Sticky Glassmorphic Header */}
+      {/* Sticky Glassmorphic Header */}
       <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/75 dark:bg-zinc-950/75 backdrop-blur-xl transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
+            
             {/* Logo */}
             <Link href="/" className="group flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
@@ -72,22 +87,16 @@ export default function LandingPage() {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
                 </span>
               </Link>
-              <Link href="#contact" className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition-colors">Contact</Link>
             </nav>
 
             {/* Actions */}
             <div className="flex items-center gap-3">
-              {/* Theme Toggle (Hydration safe) */}
               <button
                 onClick={toggleTheme}
                 aria-label="Toggle theme"
                 className="p-2 rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
-                {mounted ? (
-                  isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
-                ) : (
-                  <div className="w-4 h-4" />
-                )}
+                <ThemeIcon className="w-5 h-5" />
               </button>
 
               <Link
@@ -95,88 +104,3 @@ export default function LandingPage() {
                 className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
               >
                 Sign In
-              </Link>
-
-              {/* Mobile Hamburger */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-zinc-600 dark:text-zinc-300"
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* 2. Centered Hero & Floating Status Badges */}
-      <main className="relative z-10 pt-16 pb-24 md:pt-24 md:pb-36 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col items-center text-center">
-        <div className="relative w-full max-w-4xl mx-auto">
-          {/* Badge 1 (Top Left) */}
-          <div className="hidden lg:flex absolute -top-12 -left-12 z-20 items-center gap-3 px-4 py-3 rounded-2xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/90 dark:border-zinc-800/90 shadow-xl">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-semibold text-zinc-900 dark:text-white">CSC201 Past Q's Uploaded</p>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">2 mins ago • Verified</p>
-            </div>
-          </div>
-
-          {/* Badge 2 (Mid Right - Amber Tint) */}
-          <div className="hidden lg:flex absolute top-28 -right-14 z-20 items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50/85 dark:bg-amber-950/40 backdrop-blur-xl border border-amber-200/90 dark:border-amber-700/40 shadow-xl">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/60 border border-amber-300/80 dark:border-amber-600/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <Coins className="w-4 h-4" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-bold text-amber-900 dark:text-amber-200">+50 C-Coins Earned</p>
-              <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-mono">Peer Solution Verified</p>
-            </div>
-          </div>
-
-          {/* Badge 3 (Bottom Right) */}
-          <div className="hidden lg:flex absolute -bottom-10 right-8 z-20 items-center gap-3 px-4 py-3 rounded-2xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/90 dark:border-zinc-800/90 shadow-xl">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200/60 dark:border-purple-800/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
-              <Bot className="w-4 h-4" />
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs font-semibold text-zinc-900 dark:text-white">Samuel AI Online</p>
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              </div>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Ready for Q&A Analysis</p>
-            </div>
-          </div>
-
-          {/* Headline */}
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-[1.08]">
-            Your Campus,{' '}
-            <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 bg-clip-text text-transparent">
-              Connected.
-            </span>
-          </h1>
-
-          <p className="mt-6 text-base sm:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            The modern academic social network. Access verified past questions, collaborate with peers, and earn C-Coins while you excel.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/signup"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/25 transition-all"
-            >
-              <span>Get Started -&gt;</span>
-            </Link>
-            <Link
-              href="/signin"
-              className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-xl text-base font-semibold text-zinc-900 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 backdrop-blur-sm transition-all"
-            >
-              Sign In
-            </Link>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
