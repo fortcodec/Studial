@@ -233,7 +233,7 @@ export default function AuthPage() {
           
           <div className="mt-12 text-center">
             <p className="text-xs text-zinc-500 dark:text-zinc-600">
-              © {new Date().getFullYear()} Studial. All rights reserved.
+              © 2026 Studial. All rights reserved.
             </p>
           </div>
         </div>
