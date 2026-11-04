@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { 
-  GraduationCap, Flame, Coins, Image as ImageIcon, Paperclip, Smile, Send, 
+  GraduationCap, Flame, Coins, Image as ImageIcon, Paperclip, Send, 
   ArrowUp, MessageSquare, Share2, Home, BookOpen, Bot, User, 
-  Search, LogOut, Loader2, Sparkles, Hash, MoreHorizontal, X, MessageCircle
+  Search, LogOut, Loader2, Sparkles, Hash, MoreHorizontal, X, MessageCircle, Sun, Moon
 } from 'lucide-react';
 
 interface Profile {
@@ -31,23 +31,52 @@ interface Post {
 
 export default function DashboardPage() {
   const router = useRouter();
+  
+  // Theme State
+  const [mounted, setMounted] = useState(false);
+  const [isDark, setIsDark] = useState(true);
+
+  // Core States
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
-  
   const [posts, setPosts] = useState<Post[]>([]);
   const [postContent, setPostContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // UI Interactive States
+  // Interactive UI States
   const [showReward, setShowReward] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [activeCommentPost, setActiveCommentPost] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [isCommenting, setIsCommenting] = useState(false);
   
-  // File Upload Refs
   const imageRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Student';
+
+  // Theme logic
+  useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem('studial-theme');
+    if (stored === 'light') {
+      setIsDark(false);
+      document.documentElement.classList.remove('dark');
+    } else {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (nextDark) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+    localStorage.setItem('studial-theme', nextDark ? 'dark' : 'light');
+  };
+
+  const ThemeIcon = mounted ? (isDark ? Moon : Sun) : () => <div className="w-5 h-5" />;
 
   const fetchPosts = async (userId: string) => {
     const { data, error } = await supabase
@@ -59,7 +88,7 @@ export default function DashboardPage() {
         comments (id)
       `)
       .order('created_at', { ascending: false })
-      .limit(20); // Limit speeds up initial load
+      .limit(20);
 
     if (data) {
       const formattedPosts: Post[] = data.map((p: any) => ({
@@ -93,11 +122,10 @@ export default function DashboardPage() {
 
         if (profileError) throw profileError;
 
-        // Daily Login Reward Logic
         const today = new Date().toISOString().split('T')[0];
         if (data.last_login !== today) {
           const newCoins = data.c_coins + 2;
-          const newStreak = data.study_streak + 1; // Assuming consecutive, simplified for now
+          const newStreak = data.study_streak + 1;
           
           await supabase.from('profiles').update({ 
             last_login: today, 
@@ -108,8 +136,6 @@ export default function DashboardPage() {
           data.c_coins = newCoins;
           data.study_streak = newStreak;
           setShowReward(true);
-          
-          // Auto-hide popup after 4 seconds
           setTimeout(() => setShowReward(false), 4000);
         }
 
@@ -141,10 +167,41 @@ export default function DashboardPage() {
     }
   };
 
+  // The New Functional Comment System
+  const handlePostComment = async (postId: string) => {
+    if (!commentText.trim() || !profile) return;
+    setIsCommenting(true);
+
+    try {
+      // 1. Insert into database
+      const { error } = await supabase.from('comments').insert({
+        post_id: postId,
+        user_id: profile.id,
+        content: commentText
+      });
+
+      if (error) throw error;
+
+      // 2. Optimistic UI update (instantly update comment count)
+      setPosts(posts.map(p => {
+        if (p.id === postId) {
+          return { ...p, comments_count: p.comments_count + 1 };
+        }
+        return p;
+      }));
+      
+      // 3. Reset input
+      setCommentText('');
+      setActiveCommentPost(null); 
+    } catch (error) {
+      console.error('Error posting comment:', error);
+    } finally {
+      setIsCommenting(false);
+    }
+  };
+
   const handleUpvote = async (postId: string) => {
     if (!profile) return;
-
-    // Optimistic UI Update for instant feedback
     setPosts(posts.map(p => {
       if (p.id === postId) {
         const isNowUpvoted = !p.has_upvoted;
@@ -167,92 +224,92 @@ export default function DashboardPage() {
     }
   };
 
-  // Route to Chat Page
   const handleChatUser = (userId: string) => {
-    if (userId === profile?.id) return; // Can't chat with yourself
+    if (userId === profile?.id) return;
     router.push(`/messages/${userId}`);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center gap-4 transition-colors">
+        <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-500 animate-spin" />
         <p className="text-zinc-500 text-sm font-medium">Entering campus dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col pb-20 md:pb-0 relative">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col pb-24 md:pb-0 relative transition-colors duration-300">
       
-      {/* Daily Reward Pop-up */}
       {showReward && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-10 fade-in duration-500">
-          <div className="bg-zinc-900 border border-yellow-500/30 shadow-2xl shadow-yellow-500/20 px-6 py-4 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center">
-              <Coins className="w-6 h-6 text-yellow-500" />
+          <div className="bg-white dark:bg-zinc-900 border border-yellow-500/30 shadow-2xl shadow-yellow-500/20 px-6 py-4 rounded-2xl flex items-center gap-4">
+            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-500/10 rounded-full flex items-center justify-center">
+              <Coins className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-lg">Daily Check-in!</h3>
-              <p className="text-zinc-400 text-sm">You earned <span className="text-yellow-400 font-bold">+2 C-Coins</span> for logging in today.</p>
+              <h3 className="font-bold text-zinc-900 dark:text-white text-lg">Daily Check-in!</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">You earned <span className="text-yellow-600 dark:text-yellow-400 font-bold">+2 C-Coins</span> for logging in today.</p>
             </div>
-            <button onClick={() => setShowReward(false)} className="ml-4 p-2 hover:bg-zinc-800 rounded-full">
+            <button onClick={() => setShowReward(false)} className="ml-4 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
               <X className="w-4 h-4 text-zinc-500" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Background blobs */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/10 dark:bg-blue-600/10 rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-grow relative z-10 flex">
         
         {/* CENTER FEED */}
-        <main className="flex-1 py-6 md:py-8 md:px-8 lg:border-r lg:border-l border-zinc-800/60 max-w-3xl mx-auto w-full">
+        <main className="flex-1 py-6 md:py-8 md:px-8 lg:border-r lg:border-l border-zinc-200 dark:border-zinc-800/60 max-w-3xl mx-auto w-full transition-colors">
           
-          <header className="flex justify-between items-center bg-zinc-900/40 backdrop-blur-2xl border border-zinc-800/60 p-4 rounded-2xl mb-6 sticky top-4 z-30">
+          <header className="flex justify-between items-center bg-white/80 dark:bg-zinc-900/40 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/60 p-4 rounded-2xl mb-6 sticky top-4 z-30 shadow-sm transition-colors">
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-blue-400 font-semibold tracking-wider uppercase">V2.4 Academic</span>
-              <h1 className="text-lg font-bold text-white truncate max-w-[140px] sm:max-w-[200px]">
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold tracking-wider uppercase">V2.4 Academic</span>
+              <h1 className="text-lg font-bold text-zinc-900 dark:text-white truncate max-w-[140px] sm:max-w-[200px]">
                 Welcome, {firstName}
               </h1>
             </div>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 px-3 py-1.5 rounded-xl text-orange-400">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Theme Toggle Button Added to Header */}
+              <button onClick={toggleTheme} className="p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <ThemeIcon className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-1.5 bg-orange-100 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-3 py-1.5 rounded-xl text-orange-600 dark:text-orange-400">
                 <Flame className="w-4 h-4 text-orange-500 fill-orange-500/20" />
                 <span className="text-xs sm:text-sm font-bold">{profile?.study_streak || 0} Days</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-xl text-yellow-400">
+              <div className="flex items-center gap-1.5 bg-yellow-100 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 px-3 py-1.5 rounded-xl text-yellow-600 dark:text-yellow-400">
                 <Coins className="w-4 h-4 text-yellow-500 fill-yellow-500/20" />
                 <span className="text-xs sm:text-sm font-bold">{profile?.c_coins || 0} C-Coins</span>
               </div>
             </div>
           </header>
 
-          <form onSubmit={handleCreatePost} className="bg-zinc-900/40 border border-zinc-800/60 p-4 rounded-2xl mb-6 shadow-sm">
+          <form onSubmit={handleCreatePost} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/60 p-4 rounded-2xl mb-6 shadow-sm transition-colors">
             <textarea 
               value={postContent}
               onChange={(e) => setPostContent(e.target.value)}
               placeholder="Share a study tip or ask a question..." 
-              className="w-full bg-transparent border-0 outline-0 resize-none h-20 text-sm sm:text-base text-zinc-100 placeholder-zinc-500 focus:ring-0"
+              className="w-full bg-transparent border-0 outline-0 resize-none h-20 text-sm sm:text-base text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 focus:ring-0"
             />
-            <div className="flex justify-between items-center border-t border-zinc-800/60 pt-3 mt-3">
+            <div className="flex justify-between items-center border-t border-zinc-100 dark:border-zinc-800/60 pt-3 mt-3">
               <div className="flex gap-1.5 sm:gap-2">
-                {/* Hidden File Inputs */}
                 <input type="file" hidden ref={imageRef} accept="image/*" />
                 <input type="file" hidden ref={fileRef} accept=".pdf,.doc,.docx" />
-                
-                <button type="button" onClick={() => imageRef.current?.click()} className="p-2 rounded-xl bg-zinc-800/50 text-zinc-400 hover:text-white transition-colors">
+                <button type="button" onClick={() => imageRef.current?.click()} className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
                   <ImageIcon className="w-4.5 h-4.5" />
                 </button>
-                <button type="button" onClick={() => fileRef.current?.click()} className="p-2 rounded-xl bg-zinc-800/50 text-zinc-400 hover:text-white transition-colors">
+                <button type="button" onClick={() => fileRef.current?.click()} className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
                   <Paperclip className="w-4.5 h-4.5" />
                 </button>
               </div>
-              <button type="submit" disabled={isSubmitting || !postContent.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-2.5 flex items-center gap-2 active:scale-95 text-sm cursor-pointer">
+              <button type="submit" disabled={isSubmitting || !postContent.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-2.5 flex items-center gap-2 active:scale-95 text-sm cursor-pointer transition-all shadow-md shadow-blue-600/20">
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Publish</span><Send className="w-4 h-4" /></>}
               </button>
             </div>
@@ -260,19 +317,19 @@ export default function DashboardPage() {
 
           <div className="space-y-4">
             {posts.map((post) => (
-              <article key={post.id} className="bg-zinc-900/40 border border-zinc-800/60 p-4 sm:p-5 rounded-2xl shadow-sm transition-all duration-300 relative">
+              <article key={post.id} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/60 p-4 sm:p-5 rounded-2xl shadow-sm transition-colors duration-300 relative">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-3 items-center">
                     <div 
                       onClick={() => handleChatUser(post.user_id)}
-                      className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold border border-zinc-700 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                      className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold border border-blue-200 dark:border-zinc-700 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
                     >
                       {post.user_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <span 
                         onClick={() => handleChatUser(post.user_id)}
-                        className="font-bold text-white hover:underline cursor-pointer text-sm"
+                        className="font-bold text-zinc-900 dark:text-white hover:underline cursor-pointer text-sm"
                       >
                         {post.user_name}
                       </span>
@@ -280,46 +337,66 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   
-                  {/* Functional Dropdown Menu */}
                   <div className="relative">
-                    <button onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)} className="text-zinc-500 p-1 hover:bg-zinc-800 rounded-lg">
+                    <button onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)} className="text-zinc-500 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
                       <MoreHorizontal className="w-5 h-5" />
                     </button>
                     {activeDropdown === post.id && (
-                      <div className="absolute right-0 mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl z-20 py-1 animate-in fade-in zoom-in-95">
-                        <button onClick={() => handleChatUser(post.user_id)} className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2">
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-20 py-1 animate-in fade-in zoom-in-95">
+                        <button onClick={() => handleChatUser(post.user_id)} className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2">
                           <MessageCircle className="w-4 h-4" /> Message User
                         </button>
                         {post.user_id === profile?.id && (
-                          <button className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10">Delete Post</button>
+                          <button className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">Delete Post</button>
                         )}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <p className="text-sm text-zinc-200 leading-relaxed mb-4 whitespace-pre-wrap">{post.content}</p>
+                <p className="text-sm text-zinc-700 dark:text-zinc-200 leading-relaxed mb-4 whitespace-pre-wrap">{post.content}</p>
 
-                <div className="flex gap-2 sm:gap-4 border-t border-zinc-800/40 pt-3">
-                  <button onClick={() => handleUpvote(post.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${post.has_upvoted ? 'bg-blue-500/10 border border-blue-500/20 text-blue-400' : 'bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65'}`}>
-                    <ArrowUp className={`w-4 h-4 ${post.has_upvoted ? 'text-blue-400 animate-bounce' : 'text-zinc-400'}`} />
+                <div className="flex gap-2 sm:gap-4 border-t border-zinc-100 dark:border-zinc-800/40 pt-3">
+                  <button onClick={() => handleUpvote(post.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${post.has_upvoted ? 'bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65'}`}>
+                    <ArrowUp className={`w-4 h-4 ${post.has_upvoted ? 'text-blue-600 dark:text-blue-400 animate-bounce' : 'text-zinc-400'}`} />
                     <span>{post.upvotes}</span>
                   </button>
-                  <button onClick={() => setActiveCommentPost(activeCommentPost === post.id ? null : post.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65 hover:text-white transition-all text-xs sm:text-sm font-semibold">
+                  <button 
+                    onClick={() => {
+                      setActiveCommentPost(activeCommentPost === post.id ? null : post.id);
+                      setCommentText(''); // Clear input when toggling a new comment box
+                    }} 
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold"
+                  >
                     <MessageSquare className="w-4 h-4" />
                     <span>{post.comments_count}</span>
                   </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/30 text-zinc-400 hover:bg-zinc-800/65 hover:text-white transition-all text-xs sm:text-sm font-semibold ml-auto">
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800/65 hover:text-zinc-900 dark:hover:text-white transition-all text-xs sm:text-sm font-semibold ml-auto">
                     <Share2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* Expanding Comment Box */}
+                {/* The Functional Comment Box */}
                 {activeCommentPost === post.id && (
-                  <div className="mt-4 pt-4 border-t border-zinc-800/50 animate-in fade-in slide-in-from-top-2">
+                  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-2">
                     <div className="flex gap-2">
-                      <input type="text" placeholder="Write a comment..." className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
-                      <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium text-sm">Post</button>
+                      <input 
+                        type="text" 
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        placeholder="Write a comment..." 
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handlePostComment(post.id);
+                        }}
+                        className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" 
+                      />
+                      <button 
+                        onClick={() => handlePostComment(post.id)}
+                        disabled={isCommenting || !commentText.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer flex items-center justify-center min-w-[60px]"
+                      >
+                        {isCommenting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post'}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -329,12 +406,27 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-2xl border-t border-zinc-800/80 z-40 flex justify-around py-3">
-        <button className="flex flex-col items-center gap-1.5 text-blue-500 py-0.5 px-3"><Home className="w-5 h-5 fill-blue-500/10" /></button>
-        <button className="flex flex-col items-center gap-1.5 text-zinc-500 hover:text-white py-0.5 px-3"><BookOpen className="w-5 h-5" /></button>
-        <button onClick={() => router.push('/messages')} className="flex flex-col items-center gap-1.5 text-zinc-500 hover:text-white py-0.5 px-3"><MessageCircle className="w-5 h-5" /></button>
-        <button className="flex flex-col items-center gap-1.5 text-zinc-500 hover:text-white py-0.5 px-3"><User className="w-5 h-5" /></button>
+      {/* Restored Labels to Mobile Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800/80 z-40 flex justify-around py-2 pb-4 transition-colors">
+        <button className="flex flex-col items-center gap-1 text-blue-600 dark:text-blue-500 py-1 px-3">
+          <Home className="w-5 h-5 fill-blue-500/10" />
+          <span className="text-[10px] font-bold tracking-wide">Home</span>
+        </button>
+        <button className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
+          <BookOpen className="w-5 h-5" />
+          <span className="text-[10px] font-bold tracking-wide">Past Qs</span>
+        </button>
+        <button onClick={() => router.push('/messages')} className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
+          <MessageCircle className="w-5 h-5" />
+          <span className="text-[10px] font-bold tracking-wide">Chat</span>
+        </button>
+        <button className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
+          <User className="w-5 h-5" />
+          <span className="text-[10px] font-bold tracking-wide">Profile</span>
+        </button>
       </nav>
+
     </div>
   );
 }
+          
