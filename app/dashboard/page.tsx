@@ -414,14 +414,6 @@ export default function DashboardPage() {
         </button>
         <button className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
           <BookOpen className="w-5 h-5" />
-          <span className="text-[10px] font-bold tracking-wide">Past Qs</span>
-        </button>
-        <button onClick={() => router.push('/messages')} className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
-          <MessageCircle className="w-5 h-5" />
-          <span className="text-[10px] font-bold tracking-wide">Chat</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-3">
-          <User className="w-5 h-5" />
           <span className="text-[10px] font-bold tracking-wide">Profile</span>
         </button>
       </nav>
@@ -429,4 +421,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-          
