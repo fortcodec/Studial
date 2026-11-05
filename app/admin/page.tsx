@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   ShieldAlert, Users, FileText, Activity, Settings, 
   LogOut, TrendingUp, AlertCircle, Database, Search, 
-  ChevronRight, Loader2, Sparkles, Ban
+  Loader2, Sparkles, Ban
 } from 'lucide-react';
 
 interface AdminStats {
@@ -39,7 +39,6 @@ export default function PremiumAdminPanel() {
           return;
         }
 
-        // 1. Strict Authorization Check
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('full_name, is_admin')
@@ -47,17 +46,17 @@ export default function PremiumAdminPanel() {
           .single();
 
         if (error || !profile?.is_admin) {
-          router.push('/dashboard'); // Kick non-admins back to the student feed
+          router.push('/dashboard'); 
           return;
         }
 
-        setAdminName(profile.full_name);
+        // Safely set admin name with fallback
+        setAdminName(profile?.full_name || 'Super Admin');
 
-        // 2. Fetch High-Level Metrics
         const [usersReq, postsReq, commentsReq] = await Promise.all([
-          supabase.from('profiles').select('id', { count: 'exact' }),
-          supabase.from('posts').select('id', { count: 'exact' }),
-          supabase.from('comments').select('id', { count: 'exact' })
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('posts').select('id', { count: 'exact', head: true }),
+          supabase.from('comments').select('id', { count: 'exact', head: true })
         ]);
 
         setStats({
@@ -66,7 +65,6 @@ export default function PremiumAdminPanel() {
           totalComments: commentsReq.count || 0,
         });
 
-        // 3. Fetch Recent Registrations
         const { data: latestUsers } = await supabase
           .from('profiles')
           .select('id, full_name, c_coins, study_streak, created_at')
@@ -105,13 +103,11 @@ export default function PremiumAdminPanel() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex relative overflow-hidden">
       
-      {/* Premium Ambient Background */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[120px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-indigo-900/10 rounded-full blur-[150px]" />
       </div>
 
-      {/* Sidebar Navigation */}
       <aside className="w-72 bg-zinc-900/40 backdrop-blur-3xl border-r border-zinc-800/50 hidden lg:flex flex-col relative z-10 shadow-2xl shadow-black">
         <div className="p-8 border-b border-zinc-800/50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
@@ -145,11 +141,11 @@ export default function PremiumAdminPanel() {
         <div className="p-4 border-t border-zinc-800/50">
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shrink-0">
                 <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
               </div>
-              <div>
-                <p className="text-sm font-bold text-white truncate max-w-[120px]">{adminName}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white truncate">{adminName}</p>
                 <p className="text-[10px] text-emerald-500 uppercase tracking-wider font-bold">Super Admin</p>
               </div>
             </div>
@@ -161,27 +157,36 @@ export default function PremiumAdminPanel() {
         </div>
       </aside>
 
-      {/* Main Dashboard Area */}
       <main className="flex-1 overflow-y-auto relative z-10">
-        <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8">
+        {/* Mobile Header - Shows on small screens so you can still log out */}
+        <div className="lg:hidden p-4 border-b border-zinc-800/50 flex justify-between items-center bg-zinc-900/40 backdrop-blur-xl sticky top-0 z-20">
+           <div className="flex items-center gap-2">
+            <ShieldAlert className="w-6 h-6 text-blue-500" />
+            <span className="font-extrabold text-white">FortCodec Admin</span>
+          </div>
+          <button onClick={handleLogout} className="p-2 text-red-400 bg-red-500/10 rounded-lg">
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8">
           
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h2 className="text-3xl font-extrabold text-white tracking-tight">System Overview</h2>
-              <p className="text-zinc-400 mt-1">Real-time metrics for the Studial network.</p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">System Overview</h2>
+              <p className="text-zinc-400 mt-1 text-sm sm:text-base">Real-time metrics for the Studial network.</p>
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-4 top-3 w-5 h-5 text-zinc-500" />
               <input 
                 type="text" 
-                placeholder="Search users, IDs, IP logs..." 
+                placeholder="Search users, IDs..." 
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl py-2.5 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
               />
             </div>
           </header>
 
-          {/* Metric Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/60 p-6 rounded-2xl relative overflow-hidden group hover:border-blue-500/30 transition-colors">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
               <div className="flex justify-between items-start mb-4 relative z-10">
@@ -192,7 +197,7 @@ export default function PremiumAdminPanel() {
                   <TrendingUp className="w-3 h-3" /> +12%
                 </span>
               </div>
-              <h3 className="text-4xl font-extrabold text-white relative z-10">{stats.totalUsers.toLocaleString()}</h3>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{stats.totalUsers.toLocaleString() || 0}</h3>
               <p className="text-zinc-500 text-sm font-medium mt-1 relative z-10">Registered Students</p>
             </div>
 
@@ -203,70 +208,74 @@ export default function PremiumAdminPanel() {
                   <Database className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-4xl font-extrabold text-white relative z-10">{stats.totalPosts.toLocaleString()}</h3>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{stats.totalPosts.toLocaleString() || 0}</h3>
               <p className="text-zinc-500 text-sm font-medium mt-1 relative z-10">Total Feed Posts</p>
             </div>
 
-            <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/60 p-6 rounded-2xl relative overflow-hidden group hover:border-violet-500/30 transition-colors">
+            <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/60 p-6 rounded-2xl relative overflow-hidden group hover:border-violet-500/30 transition-colors sm:col-span-2 md:col-span-1">
               <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-2xl group-hover:bg-violet-500/10 transition-colors" />
               <div className="flex justify-between items-start mb-4 relative z-10">
                 <div className="p-3 bg-violet-500/10 rounded-xl border border-violet-500/20 text-violet-400">
                   <MessageSquare className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-4xl font-extrabold text-white relative z-10">{stats.totalComments.toLocaleString()}</h3>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{stats.totalComments.toLocaleString() || 0}</h3>
               <p className="text-zinc-500 text-sm font-medium mt-1 relative z-10">Active Comments</p>
             </div>
           </div>
 
-          {/* Data Table: Recent Operations */}
           <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
-            <div className="p-6 border-b border-zinc-800/60 flex justify-between items-center bg-zinc-900/50">
-              <div className="flex items-center gap-3">
-                <Sparkles className="w-5 h-5 text-blue-500" />
-                <h3 className="text-lg font-bold text-white">Recent Registrations</h3>
+            <div className="p-4 sm:p-6 border-b border-zinc-800/60 flex justify-between items-center bg-zinc-900/50">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0" />
+                <h3 className="text-base sm:text-lg font-bold text-white">Recent Registrations</h3>
               </div>
-              <button className="text-sm font-semibold text-blue-500 hover:text-blue-400">View All</button>
+              <button className="text-xs sm:text-sm font-semibold text-blue-500 hover:text-blue-400">View All</button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[500px]">
                 <thead>
-                  <tr className="border-b border-zinc-800/50 text-zinc-400 text-xs uppercase tracking-widest bg-zinc-950/30">
-                    <th className="px-6 py-4 font-semibold">Student Name</th>
-                    <th className="px-6 py-4 font-semibold">C-Coins Balance</th>
-                    <th className="px-6 py-4 font-semibold">Study Streak</th>
-                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                  <tr className="border-b border-zinc-800/50 text-zinc-400 text-[10px] sm:text-xs uppercase tracking-widest bg-zinc-950/30">
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-semibold">Student Name</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-semibold">C-Coins Balance</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-semibold">Study Streak</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/30 text-sm">
-                  {recentUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-zinc-800/20 transition-colors group">
-                      <td className="px-6 py-4 font-medium text-zinc-200 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400 border border-zinc-700">
-                          {user.full_name.charAt(0).toUpperCase()}
-                        </div>
-                        {user.full_name}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 bg-yellow-500/10 text-yellow-500 px-2.5 py-1 rounded-lg text-xs font-bold border border-yellow-500/20">
-                          {user.c_coins}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-400 px-2.5 py-1 rounded-lg text-xs font-bold border border-orange-500/20">
-                          <Flame className="w-3 h-3" /> {user.study_streak}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors inline-flex items-center justify-center">
-                          <Ban className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-zinc-800/30 text-xs sm:text-sm">
+                  {recentUsers.map((user) => {
+                    const safeName = user.full_name || 'Student';
+                    const initial = safeName.charAt(0).toUpperCase();
+                    
+                    return (
+                      <tr key={user.id} className="hover:bg-zinc-800/20 transition-colors group">
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium text-zinc-200 flex items-center gap-3">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] sm:text-xs font-bold text-zinc-400 border border-zinc-700 shrink-0">
+                            {initial}
+                          </div>
+                          <span className="truncate">{safeName}</span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4">
+                          <span className="inline-flex items-center gap-1.5 bg-yellow-500/10 text-yellow-500 px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold border border-yellow-500/20">
+                            {user.c_coins || 0}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4">
+                          <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-400 px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold border border-orange-500/20">
+                            <Flame className="w-3 h-3" /> {user.study_streak || 0}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
+                          <button className="p-1.5 sm:p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors inline-flex items-center justify-center">
+                            <Ban className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {recentUsers.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-zinc-500">No users found.</td>
+                      <td colSpan={4} className="px-6 py-8 text-center text-zinc-500 text-sm">No users found.</td>
                     </tr>
                   )}
                 </tbody>
