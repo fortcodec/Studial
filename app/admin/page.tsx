@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   ShieldAlert, Users, FileText, Activity, Settings, 
   LogOut, TrendingUp, AlertCircle, Database, Search, 
-  Loader2, Sparkles, Ban
+  Loader2, Sparkles, Ban, MessageSquare
 } from 'lucide-react';
 
 interface AdminStats {
@@ -50,7 +50,6 @@ export default function PremiumAdminPanel() {
           return;
         }
 
-        // Safely set admin name with fallback
         setAdminName(profile?.full_name || 'Super Admin');
 
         const [usersReq, postsReq, commentsReq] = await Promise.all([
@@ -158,7 +157,6 @@ export default function PremiumAdminPanel() {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative z-10">
-        {/* Mobile Header - Shows on small screens so you can still log out */}
         <div className="lg:hidden p-4 border-b border-zinc-800/50 flex justify-between items-center bg-zinc-900/40 backdrop-blur-xl sticky top-0 z-20">
            <div className="flex items-center gap-2">
             <ShieldAlert className="w-6 h-6 text-blue-500" />
@@ -197,7 +195,7 @@ export default function PremiumAdminPanel() {
                   <TrendingUp className="w-3 h-3" /> +12%
                 </span>
               </div>
-              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{stats.totalUsers.toLocaleString() || 0}</h3>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{(stats?.totalUsers || 0).toLocaleString()}</h3>
               <p className="text-zinc-500 text-sm font-medium mt-1 relative z-10">Registered Students</p>
             </div>
 
@@ -208,7 +206,7 @@ export default function PremiumAdminPanel() {
                   <Database className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{stats.totalPosts.toLocaleString() || 0}</h3>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{(stats?.totalPosts || 0).toLocaleString()}</h3>
               <p className="text-zinc-500 text-sm font-medium mt-1 relative z-10">Total Feed Posts</p>
             </div>
 
@@ -219,7 +217,7 @@ export default function PremiumAdminPanel() {
                   <MessageSquare className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{stats.totalComments.toLocaleString() || 0}</h3>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-white relative z-10">{(stats?.totalComments || 0).toLocaleString()}</h3>
               <p className="text-zinc-500 text-sm font-medium mt-1 relative z-10">Active Comments</p>
             </div>
           </div>
