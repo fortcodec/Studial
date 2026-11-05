@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   ShieldAlert, Users, FileText, Activity, Settings, 
   LogOut, TrendingUp, AlertCircle, Database, Search, 
-  Loader2, Sparkles, Ban, MessageSquare
+  Loader2, Sparkles, Ban, MessageSquare, Flame
 } from 'lucide-react';
 
 interface AdminStats {
@@ -121,7 +121,7 @@ export default function PremiumAdminPanel() {
         <nav className="flex-1 p-4 space-y-2">
           <button className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-semibold transition-all">
             <Activity className="w-5 h-5" />
-<span>Command Center</span>
+            <span>Command Center</span>
           </button>
           <button className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
             <Users className="w-5 h-5" />
