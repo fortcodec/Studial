@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -64,7 +65,7 @@ export default function AuthPage() {
     setStrength(score);
   };
 
-  // 🚀 The Core Authentication Logic
+  // 🔥 The Core Authentication & Routing Logic
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -73,12 +74,11 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // Handle Registration
         if (!fullName || !selectedUni || !email || !password) {
           throw new Error('Please fill in all required fields.');
         }
 
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -93,26 +93,34 @@ export default function AuthPage() {
 
         if (error) throw error;
         
-        // Success! Clear form, show message, flip to sign-in view
         setSuccessMsg('Account created successfully! Please sign in.');
         setFullName(''); setDob(''); setSelectedUni(''); setCustomUni(''); setPassword('');
         setTimeout(() => setIsSignUp(false), 2000);
 
       } else {
-        // Handle Login
         if (!email || !password) {
           throw new Error('Please enter your email and password.');
         }
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw error;
+        if (authError) throw authError;
         
-        // Success! Route to dashboard
-        router.push('/dashboard');
+        // Admin Routing Logic Check
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profile?.is_admin) {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       }
     } catch (error: any) {
       setErrorMsg(error.message || 'An error occurred during authentication.');
@@ -166,7 +174,6 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {/* Feedback Messages */}
           {errorMsg && (
             <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-medium animate-in fade-in">
               {errorMsg}
